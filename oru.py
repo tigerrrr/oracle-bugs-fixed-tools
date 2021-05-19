@@ -7,7 +7,7 @@ import re
 
 def PrintUsage():
 ##################
-    print ( "Usage: \n" + sys.argv[0] + " -h | -l | -p <RU> file1 [ file2 ... ]" + """
+    print ( "Usage: \n" + sys.argv[0] + " -h | -l | -r <RU> file1 [ file2 ... ]" + """
     
 Where:
       -h, --help            - print this usage
@@ -31,7 +31,7 @@ def FormatPatch(p,d):
     return np+'\t'+d
 
 # global variables
-gaPatches=[] # global list of patches for "-p" option
+gaPatches=[] # global list of patches for "-r" option
 gaRU=[] # global list of RU for "-l" option 
 bList=False
 pRU=''
