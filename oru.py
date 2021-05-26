@@ -4,6 +4,7 @@
 import sys
 import getopt
 import re
+from collections import defaultdict
 
 def PrintUsage():
 ##################
@@ -31,12 +32,11 @@ def FormatPatch(p,d):
     return np+'\t'+d
 
 # global variables
-gaPatches=[] # global list of patches for "-r" option
-gaRU=[] # global list of RU for "-l" option 
 bList=False
 pRU=''
+gdRuPatches=defaultdict(list) # global dictionary of {"RU":[patches]}
 
-# parse 
+# parse command line 
 try:
     opts, args = getopt.getopt(sys.argv[1:], 'hlr:', ['help', 'list','release-update='])
 
@@ -66,7 +66,7 @@ for file in args:
         sDesc = ''
         aPatches=[]
         for line in fp:
-            #print (line.rstrip()) 
+            ###print ('['+line.rstrip()+']') 
             # table pattern
             if re.match('^            [+\|]',line):
                 # if RU separator
@@ -81,10 +81,7 @@ for file in args:
 
                         # if RU in this block patches one we we intertested in  
                         if re.match(pRU,sRU):
-                            #print (sRU)
-                            #print ('========================')
-                            #print (*aPatches, sep='\n')
-                            gaPatches.extend(aPatches) # add to global list
+                            gdRuPatches[sRU].extend(aPatches) # add patch to global list
 
                         sRU = ''
                         aPatches=[]
@@ -96,12 +93,12 @@ for file in args:
                     # [1] RU or empty
                     # [2] patch or separator or empty
                     # [3] patch description or empty if patch contain separator 
-                    ##print ('>'+aLine[1].strip()+'<')
+                    ###print ('>'+aLine[1].strip()+'<')
                     if not sRU and aLine[1].strip():
                         sRU = aLine[1].strip()
-                        if bList and not sRU in gaRU:
-                            gaRU.append(sRU) 
-                        #print ('Found RU:'+sRU) 
+                        if bList and not sRU in gdRuPatches:
+                            # print ('[['+sRU+']]')
+                            gdRuPatches[sRU] = [] 
 
                     # patch id is not separator
                     if not re.match('[-]',aLine[2].strip()):     
@@ -127,13 +124,11 @@ for file in args:
                 #nil
 # printing final results
 if bList:
-    gaRU.sort()
-    print(*gaRU, sep='\n')
+    print (*gdRuPatches,sep='\n')
 
 if pRU:
     print ('# ' + pRU)
     print ('========================')
-    print (*gaPatches, sep='\n')
+    print (*gdRuPatches[pRU], sep='\n')
     print ('========================')
-    print ('# total patches:  {}'.format(len(gaPatches)))
-
+    print ('# total patches:  {}'.format(len(gdRuPatches[pRU])))    
