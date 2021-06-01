@@ -8,12 +8,13 @@ from collections import defaultdict
 
 def PrintUsage():
 ##################
-    print ( "Usage: \n" + sys.argv[0] + " -h | -l | -r <RU> file1 [ file2 ... ]" + """
+    print ( "Usage: \n" + sys.argv[0] + " -h | [-e] {-l | [-r <RU>] } file1 [ file2 ... ]" + """
     
 Where:
       -h, --help            - print this usage
-      -l, --list            - print all RU/RUR found in files
-      -r <RU>, --ru <RU>    - print all patches for specified <RU> found in files
+      -e, --extended        - print extended information in format: <RU> | <PATH>
+      -l, --list            - print all RU/RUR found in files and number of patches if -e option
+      -r <RU>, --ru <RU>    - print only patches for specified <RU> found in files
     
     file# should be created by elinks using "File"->"Save formatted document" command  
 
@@ -33,12 +34,22 @@ def FormatPatch(p,d):
 
 # global variables
 bList=False
+bExtended=False
 pRU=''
 gdRuPatches=defaultdict(list) # global dictionary of {"RU":[patches]}
 
+# so far the longest possible RU version will contain 28 characters, but we give +1 just in case :
+# 12.2.0.1.DBOCT2019RUR:200414
+# 18.9.1.0.DBJAN2020RUR:200414
+# 18.10.1.0.DBRUR:200714        
+# 19.5.2.0.DBJAN2020RUR:200414
+# 19.10.1.0.0.DBRUR:210420
+# 123456789012345678901234567890 formatting ruller 
+iRuLen = 29
+
 # parse command line 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'hlr:', ['help', 'list','release-update='])
+    opts, args = getopt.getopt(sys.argv[1:], 'hler:', ['help', 'list','extended','release-update='])
 
     for opt, arg in opts:
         if opt in ('-h','--help'):
@@ -46,6 +57,8 @@ try:
             sys.exit()
         elif opt in ('-l','--list'):
             bList = True
+        elif opt in ('-e','--extended'):
+            bExtended = True    
         elif opt in ('-r','--release-update'):
             pRU=arg
 
@@ -68,9 +81,9 @@ for file in args:
         for line in fp:
             ###print ('['+line.rstrip()+']') 
             # table pattern
-            if re.match('^            [+\|]',line):
+            if re.match('^[ ]+[+\|]',line):
                 # if RU separator
-                if re.match('^            [+\|][-]',line):
+                if re.match('^[ ]+[+\|][-]',line):
                     # this is final separator, then sRU and aPatches are ready
                     if sRU:
                         # add last patch from list, because RU separator hijack Patch separator 
@@ -80,7 +93,7 @@ for file in args:
                             sDesc = ''
 
                         # if RU in this block patches one we we intertested in  
-                        if re.match(pRU,sRU):
+                        if not pRU or (pRU and re.match(pRU,sRU)):
                             gdRuPatches[sRU].extend(aPatches) # add patch to global list
 
                         sRU = ''
@@ -123,12 +136,26 @@ for file in args:
             #else:
                 #nil
 # printing final results
-if bList:
-    print (*gdRuPatches,sep='\n')
 
-if pRU:
-    print ('# ' + pRU)
-    print ('========================')
-    print (*gdRuPatches[pRU], sep='\n')
-    print ('========================')
-    print ('# total patches:  {}'.format(len(gdRuPatches[pRU])))    
+
+
+
+if bList:
+    for key in sorted(gdRuPatches):
+        if bExtended:
+            print(f'{key:{iRuLen}}'+'|{:4}'.format(len(gdRuPatches[key])))
+        else:
+            print(key)
+    #print (*sorted(gdRuPatches),sep='\n')
+else:
+    for key in gdRuPatches:
+        for patch in gdRuPatches[key]:
+            if bExtended :
+                print( f'{key:{iRuLen}}',end='|')
+            print (patch)
+
+        #print ('# ' + key)
+        #print ('========================')
+        #print (*gdRuPatches[key], sep='\n')
+        #print ('========================')
+        #print ('# total patches:  {}'.format(len(gdRuPatches[key])))    
