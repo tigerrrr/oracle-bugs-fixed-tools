@@ -32,6 +32,21 @@ def FormatPatch(p,d):
         np=p     
     return np+'\t'+d
 
+
+def replace_pseudograph(text):
+    replacement_dict = {
+        '┌': '+',  '─': '-', '┬': '-',  '┐': '+',
+        '├': '|',            '┼': '+',  '┤': '|',
+        '│': '|',
+        '└': '+',            '┴': '-',  '┘': '+'
+    }
+
+    for pseudograph_char, ascii_char in replacement_dict.items():
+        text = text.replace(pseudograph_char, ascii_char)
+
+    return text
+
+
 # global variables
 bList=False
 bExtended=False
@@ -72,14 +87,35 @@ if len(args)==0:
     PrintUsage()
     sys.exit(2)
 
+example = '''
+            +-------------------------------------------------------------------------------------------------------------------------------------------+
+            | 19.11.0.0.DBRU:210420 | 31341746  | gdfb ORA-600 [kdlx_read-2] while modifying table partition lob parameters                             |
+            |-----------------------+-----------+-------------------------------------------------------------------------------------------------------|
+            |                       |           | ORA-600 [kdlimemCtor]/[kokl_kaf:invalid locator                                                       |
+            | 19.10.0.0.DBRU:210119 | 29477015* | version]/[kdlxdup_rcictor_sz]/[kdld3_der:size]/[kdlferror597: unknown status] or ORA-22922 on IOT     |
+            |                       |           | With LOB Column. This bug is alerted in Note 2584581.1                                                |
+            |-----------------------+-----------+-------------------------------------------------------------------------------------------------------|
+            |                       |           | ORA-600 [kdlimemCtor]/[kokl_kaf:invalid locator                                                       |
+            | 19.9.0.0.DBRU:201020  | 29477015* | version]/[kdlxdup_rcictor_sz]/[kdld3_der:size]/[kdlferror597: unknown status] or ORA-22922 on IOT     |
+            |                       |           | With LOB Column. This bug is alerted in Note 2584581.1                                                |
+            |-----------------------+-----------+-------------------------------------------------------------------------------------------------------|
+            |                       | 24596874  | Redact TSDP: multiple ORA-600[kghfrh:ds] on running star workload                                     |
+            | 19.8.0.0.DBRU:200714  |-----------+-------------------------------------------------------------------------------------------------------|
+            |                       | 30623138  | High row cache mutex wait on looking up dc_users                                                      |
+            |-----------------------+-----------+-------------------------------------------------------------------------------------------------------|
+            | 19.7.0.0.DBRU:200414  | 29794174  | Securefile: ORA-600: internal error code, arguments: [1:kdlwgather_cont]                              |
+            +-------------------------------------------------------------------------------------------------------------------------------------------+
+'''
+
 for file in args:
     with open(file,'r') as fp:
         sRU = ''
-        sPatch = ''
+        sPatchID = ''
         sDesc = ''
         aPatches=[]
         for line in fp:
             ###print ('['+line.rstrip()+']') 
+            line = replace_pseudograph (line)
             # table pattern
             if re.match('^[ ]+[+\|]',line):
                 # if RU separator
@@ -87,14 +123,16 @@ for file in args:
                     # this is final separator, then sRU and aPatches are ready
                     if sRU:
                         # add last patch from list, because RU separator hijack Patch separator 
-                        if sPatch:
-                            aPatches.append(FormatPatch(sPatch,sDesc.strip())) # add last element  
-                            sPatch = ''
+                        if sPatchID:
+                            sPatch = FormatPatch(sPatchID,sDesc.strip())
+                            if sPatch not in aPatches:
+                                aPatches.append(str(sPatch)) # add last element  
+                            sPatchID = ''
                             sDesc = ''
 
-                        # if RU in this block patches one we we intertested in  
+                        # if RU in this block matches the one we are interested in  
                         if not pRU or (pRU and re.match(pRU,sRU)):
-                            gdRuPatches[sRU].extend(aPatches) # add patch to global list
+                            gdRuPatches[sRU].extend(aPatches) # add patches to global list
 
                         sRU = ''
                         aPatches=[]
@@ -122,24 +160,22 @@ for file in args:
                         # print('>>'+aLine[2].strip())
 
                         if aLine[2].strip():
-                            sPatch = aLine[2].strip()
+                            sPatchID = aLine[2].strip()
 
                         # patch id is not a separator, then description is continuation of previous line   
                         sDesc = sDesc + aLine[3].rstrip('|\n').strip() + " "   
                     # patch id is a separator 
                     # (may not come here if RU separator, so we repeat the code at RU separator)
                     else:
-                        aPatches.append(FormatPatch(sPatch,sDesc.strip()))
-                        sPatch=''
+                        sPatch = FormatPatch(sPatchID,sDesc.strip())
+                        if sPatch not in aPatches:
+                            aPatches.append(str(sPatch))   
+                        sPatchID=''
                         sDesc=''
             # any other lines ()
             #else:
                 #nil
 # printing final results
-
-
-
-
 if bList:
     for key in sorted(gdRuPatches):
         if bExtended:
